@@ -1,0 +1,46 @@
+import boto3
+import os
+import urllib3
+
+# This code is run for AWS Lambda (runtime Python 3.7)
+
+# Set your data.
+# See URL:https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html
+url = os.environ['url']
+bucket_name = os.environ['bucket_name']
+file_name = os.environ['file_name']
+phone_number = os.environ['phone_number']
+
+# Set up http request maker thing
+http = urllib3.PoolManager()
+
+# S3 object to store the last call
+object_s3 = boto3.resource('s3').Bucket(bucket_name).Object(file_name)
+
+# Connect to AWS Simple Notification Service
+sns_client = boto3.client('sns')
+
+def lambda_handler(event, context):
+    
+    # Ping website
+    res = http.request('POST',url)
+    new_page = res.data
+        
+    # read in old results
+    old_page = object_s3.get().get('Body').read()
+        
+    if new_page == old_page:
+        print("No new updates.")
+    else:
+        print("-- New Update --")
+
+        # Try to send a text message
+        sns_client.publish(PhoneNumber=phone_number,Message= f'Local COVID19 Site Update: {url}',)
+        print(f"SUCCESS")
+            
+        # Write new data to S3
+        object_s3.put(Body = new_page)
+        print("Successfully wrote new data to S3")
+            
+    print("done")
+    return
